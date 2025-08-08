@@ -1,31 +1,58 @@
+
 const express = require('express');
 const fs = require('fs');
+const path = require('path');
+
 
 const app = express();
+
 app.use(express.json());
 
-let keys = [];
-try {
-  const data = fs.readFileSync('./keys.json', 'utf8');
-  keys = JSON.parse(data);
-  if (Array.isArray(keys.keys)) {
-    keys = keys.keys;
-  }
-} catch (e) {
-  console.error('Failed to load keys:', e);
-}
+const PORT = process.env.PORT || 3000;
+const keysFilePath = path.join(__dirname, 'keys.json');
 
-app.post('/api/checkkey', (req, res) => {
-  const { key } = req.body;
-  if (!key) return res.status(400).json({ success: false, message: 'No key provided' });
 
-  if (keys.includes(key)) {
-    return res.json({ success: true, message: 'Key valid' });
-  } else {
-    return res.status(403).json({ success: false, message: 'Invalid or expired key' });
-  }
+app.post('/add-key', (req, res) => {
+
+    const { newKey } = req.body;
+
+
+
+    if (!newKey) {
+        return res.status(400).send('Error: newKey is required.');
+    }
+
+    fs.readFile(keysFilePath, 'utf8', (err, data) => {
+        if (err) {
+            console.error('Error reading keys.json:', err);
+            return res.status(500).send('Server error reading key file.');
+        }
+
+        let keys = [];
+        try {
+            keys = JSON.parse(data);
+        } catch (parseErr) {
+            console.error('Error parsing keys.json:', parseErr);
+            return res.status(500).send('Server error: key file is corrupted.');
+        }
+
+
+        keys.push(newKey);
+
+
+        fs.writeFile(keysFilePath, JSON.stringify(keys, null, 2), 'utf8', (writeErr) => {
+            if (writeErr) {
+                console.error('Error writing to keys.json:', writeErr);
+                return res.status(500).send('Server error writing to key file.');
+            }
+
+            console.log('Successfully added new key:', newKey);
+            res.status(200).send({ message: 'Key added successfully', key: newKey });
+        });
+    });
 });
 
-app.listen(3000, () => {
-  console.log('Server listening on port 3000');
+
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
 });
